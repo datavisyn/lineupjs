@@ -66,11 +66,11 @@ abstract class ACommonDataProvider extends ADataProvider {
    * @param desc
    * @returns {string}
    */
-  toDescRef(desc: any): any {
+  toDescRef = (desc: any): any => {
     return typeof desc.column !== 'undefined' ? `${desc.type}@${desc.column}` : this.cleanDesc(Object.assign({}, desc));
   }
 
-  fromDescRef(descRef: any): any {
+  fromDescRef = (descRef: any): any => {
     if (typeof (descRef) === 'string') {
       return this.columns.find((d: any) => `${d.type}@${d.column}` === descRef || d.type === descRef);
     }

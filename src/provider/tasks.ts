@@ -1,4 +1,4 @@
-import {abortAbleAll, IAbortAblePromise} from 'lineupengine';
+import {abortAbleAll, IAbortAblePromise, ABORTED} from 'lineupengine';
 import {ANOTHER_ROUND} from '../internal/scheduler';
 import {IForEachAble, lazySeq, boxplotBuilder, categoricalStatsBuilder, categoricalValueCacheBuilder, dateStatsBuilder, dateValueCacheBuilder, IAdvancedBoxPlotData, ICategoricalStatistics, IDateStatistics, IStatistics, normalizedStatsBuilder, dateValueCache2Value, categoricalValueCache2Value, joinIndexArrays, IBuilder, ISequence} from '../internal';
 import {CategoricalColumn, Column, ICompareValue, DateColumn, ICategoricalLikeColumn, IDataRow, IDateColumn, IGroup, ImpositionCompositeColumn, IndicesArray, INumberColumn, NumberColumn, OrdinalColumn, Ranking, UIntTypedArray, ICategory} from '../model';
@@ -10,11 +10,11 @@ import {CompareLookup} from './sort';
  * a render task that is already resolved
  */
 export class TaskNow<T> implements IRenderTask<T> {
-  constructor(public readonly v: T) {
+  constructor(public readonly v: T | symbol) {
 
   }
 
-  then<U = void>(onfullfilled: (value: T) => U) {
+  then<U = void>(onfullfilled: (value: T | symbol) => U) {
     return onfullfilled(this.v);
   }
 }
@@ -26,6 +26,11 @@ export function taskNow<T>(v: T) {
   return new TaskNow(v);
 }
 
+
+export function abortedTask<T>(): IRenderTask<T> {
+  return new TaskNow<T>(ABORTED);
+}
+
 /**
  * a render task based on an abortable promise
  */
@@ -35,7 +40,7 @@ export class TaskLater<T> implements IRenderTask<T> {
   }
 
   then<U = void>(onfullfilled: (value: T | symbol) => U): IAbortAblePromise<U> {
-    return this.v.then(onfullfilled);
+    return this.v.then(onfullfilled, () => onfullfilled(ABORTED));
   }
 }
 
@@ -47,15 +52,18 @@ export function taskLater<T>(v: IAbortAblePromise<T>) {
  * similar to Promise.all
  */
 export function tasksAll<T>(tasks: IRenderTask<T>[]): IRenderTask<T[]> {
-  if (tasks.every((t) => t instanceof TaskNow)) {
-    return taskNow(tasks.map((d) => (<TaskNow<T>>d).v));
+  if ((<(TaskNow<T> | TaskLater<T>)[]>tasks).some((d) => d.v === ABORTED)) {
+    return abortedTask();
   }
-  return taskLater(abortAbleAll((<(TaskNow<T> | TaskLater<T>)[]>tasks).map((d) => d.v)));
+  if (tasks.every((t) => t instanceof TaskNow)) {
+    return taskNow(tasks.map((d) => <T>(<TaskNow<T>>d).v));
+  }
+  return taskLater(abortAbleAll((<(TaskNow<T> | TaskLater<T>)[]>tasks).map((d) => <T>d.v)));
 }
 
 
 
-export interface IRenderTaskExectutor extends IRenderTasks {
+export interface IRenderTaskExecutor extends IRenderTasks {
   setData(data: IDataRow[]): void;
 
   dirtyColumn(col: Column, type: 'data' | 'summary' | 'group'): void;

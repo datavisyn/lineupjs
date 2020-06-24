@@ -1,5 +1,5 @@
 import {IColumnDesc, IColumnConstructor} from '../model';
-import {DataProvider, LocalDataProvider, deriveColors, deriveColumnDescriptions, IDataProviderOptions, ILocalDataProviderOptions, IAggregationStrategy} from '../provider';
+import {DataProvider, LocalDataProvider, deriveColors, RemoteDataProvider, IRemoteDataProviderOptions, deriveColumnDescriptions, IDataProviderOptions, ILocalDataProviderOptions, IAggregationStrategy, IServerData} from '../provider';
 import {LineUp, Taggle} from '../ui';
 import ColumnBuilder from './column/ColumnBuilder';
 import LineUpBuilder from './LineUpBuilder';
@@ -11,25 +11,15 @@ export * from './RankingBuilder';
 /**
  * builder for a LocalDataProvider along with LineUp configuration options
  */
-export class DataBuilder extends LineUpBuilder {
-  private readonly columns: (IColumnDesc | ((data: any[]) => IColumnDesc))[] = [];
-  private readonly providerOptions: Partial<ILocalDataProviderOptions & IDataProviderOptions> = {
-    columnTypes: {}
-  };
+export abstract class ADataBuilder<T extends IDataProviderOptions> extends LineUpBuilder {
+  protected readonly columns: (IColumnDesc | ((data: any[]) => IColumnDesc))[] = [];
+  protected abstract providerOptions: Partial<T>;
 
   private readonly rankBuilders: ((data: DataProvider) => void)[] = [];
   private _deriveColors: boolean = false;
 
-  constructor(private readonly data: object[]) {
+  constructor() {
     super();
-  }
-
-  /**
-   * use the schedulded task executor to asynchronously compute aggregations
-   */
-  scheduledTaskExecutor() {
-    this.providerOptions.taskExecutor = 'scheduled';
-    return this;
   }
 
   /**
@@ -57,26 +47,6 @@ export class DataBuilder extends LineUpBuilder {
   }
 
   /**
-   * filter all rankings by all filters in LineUp
-   */
-  filterGlobally() {
-    this.providerOptions.filterGlobally = true;
-    return this;
-  }
-
-  /**
-   * triggers to derive the column descriptions for the given data
-   * @param {string} columns optional enforced order of columns
-   */
-  deriveColumns(...columns: (string | string[])[]) {
-    const cols = (<string[]>[]).concat(...columns);
-    for (const c of deriveColumnDescriptions(this.data, {columns: cols})) {
-      this.columns.push(c);
-    }
-    return this;
-  }
-
-  /**
    * tirggers to assign colors for the given descriptions
    */
   deriveColors() {
@@ -90,7 +60,8 @@ export class DataBuilder extends LineUpBuilder {
    * @param {IColumnConstructor} clazz column class
    */
   registerColumnType(type: string, clazz: IColumnConstructor) {
-    this.providerOptions.columnTypes![type] = clazz;
+    const types = <{[columnType: string]: IColumnConstructor}>this.providerOptions.columnTypes!;
+    types[type] = clazz;
     return this;
   }
 
@@ -130,6 +101,9 @@ export class DataBuilder extends LineUpBuilder {
     return this;
   }
 
+  protected abstract createProvider(columns: IColumnDesc[]): DataProvider;
+  protected abstract get data(): any[];
+
   /**
    * builds the data provider itself
    * @returns {LocalDataProvider}
@@ -138,8 +112,10 @@ export class DataBuilder extends LineUpBuilder {
     // last come survived separted by label to be able to override columns
     const columns: IColumnDesc[] = [];
     const contained = new Set<string>();
+    const columnData = this.data;
+
     for (const col of this.columns) {
-      const c = typeof col === 'function' ? col(this.data) : col;
+      const c = typeof col === 'function' ? col(columnData) : col;
       const key = `${c.type}@${c.label}`;
       if (!contained.has(key)) {
         columns.push(c);
@@ -152,7 +128,7 @@ export class DataBuilder extends LineUpBuilder {
     if (this._deriveColors) {
       deriveColors(columns);
     }
-    const r = new LocalDataProvider(this.data, columns, this.providerOptions);
+    const r = this.createProvider(columns);
     if (this.rankBuilders.length === 0) {
       this.defaultRanking();
     }
@@ -179,6 +155,87 @@ export class DataBuilder extends LineUpBuilder {
   }
 }
 
+export default class LocalDataBuilder extends ADataBuilder<ILocalDataProviderOptions & IDataProviderOptions> {
+  protected readonly providerOptions: Partial<IDataProviderOptions & ILocalDataProviderOptions> = {
+    columnTypes: {}
+  };
+
+  constructor(protected readonly data: object[]) {
+    super();
+  }
+
+  /**
+   * use the schedulded task executor to asynchronously compute aggregations
+   */
+  scheduledTaskExecutor() {
+    this.providerOptions.taskExecutor = 'scheduled';
+    return this;
+  }
+
+  /**
+   * filter all rankings by all filters in LineUp
+   */
+  filterGlobally() {
+    this.providerOptions.filterGlobally = true;
+    return this;
+  }
+
+  protected createProvider(columns: IColumnDesc[]) {
+    return new LocalDataProvider(this.data, columns, this.providerOptions);
+  }
+
+  /**
+   * triggers to derive the column descriptions for the given data
+   * @param {string} columns optional enforced order of columns
+   */
+  deriveColumns(...columns: (string | string[])[]) {
+    const cols = (<string[]>[]).concat(...columns);
+    for (const c of deriveColumnDescriptions(this.data, {columns: cols})) {
+      this.columns.push(c);
+    }
+    return this;
+  }
+}
+
+export class RemoteDataBuilder extends ADataBuilder<IRemoteDataProviderOptions & IDataProviderOptions> {
+  protected readonly providerOptions: Partial<IDataProviderOptions & IRemoteDataProviderOptions> = {
+    columnTypes: {}
+  };
+
+  constructor(private readonly server: IServerData, protected readonly data: object[] = []) {
+    super();
+  }
+
+  /**
+   * maximal cache size
+   * @default 10000
+   */
+  maxCacheSize(maxCacheSize: number) {
+    this.providerOptions.maxCacheSize = maxCacheSize;
+    return this;
+  }
+
+  /**
+   * number of neighboring rows that should be loaded when requesting a single row
+   */
+  loadNeighbors(neighbors: number) {
+    this.providerOptions.loadNeighbors = neighbors;
+    return this;
+  }
+
+  /**
+   * whether to precompute box plot statistics
+   * @default false
+   */
+  precomputeBoxPlotStats(value: boolean | 'data' | 'summary' | 'group') {
+    this.providerOptions.precomputeBoxPlotStats = value;
+    return this;
+  }
+
+  protected createProvider(columns: IColumnDesc[]) {
+    return new RemoteDataProvider(this.server, columns, this.providerOptions);
+  }
+}
 
 /**
  * creates a new builder instance for the given data
@@ -186,9 +243,17 @@ export class DataBuilder extends LineUpBuilder {
  * @returns {DataBuilder}
  */
 export function builder(arr: object[]) {
-  return new DataBuilder(arr);
+  return new LocalDataBuilder(arr);
 }
 
+/**
+ * creates a new remote builder instance
+ * @param server the server adapter
+ * @param sampleData optional sample data that is used for deriving column bounds
+ */
+export function remote(server: IServerData, sampleData?: object[]) {
+  return new RemoteDataBuilder(server, sampleData);
+}
 
 /**
  * build a new Taggle instance in the given node for the given data

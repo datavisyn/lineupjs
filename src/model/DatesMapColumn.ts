@@ -55,6 +55,10 @@ export default class DatesMapColumn extends MapColumn<Date | null> implements ID
     return this.format;
   }
 
+  getParser() {
+    return this.parse;
+  }
+
   protected createEventList() {
     return super.createEventList().concat([DatesMapColumn.EVENT_SORTMETHOD_CHANGED, DatesMapColumn.EVENT_FILTER_CHANGED]);
   }

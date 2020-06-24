@@ -65,10 +65,7 @@ export default class SidePanelEntryVis {
 
     this.summaryUpdater = r;
     summaryNode.classList.add(engineCssClass('loading'));
-    r.then((a) => {
-      if (typeof a === 'symbol') {
-        return;
-      }
+    r.then(() => {
       summaryNode.classList.remove(engineCssClass('loading'));
     });
   }

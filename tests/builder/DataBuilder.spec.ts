@@ -1,4 +1,4 @@
-import {DataBuilder} from '../../src/builder/DataBuilder';
+import DataBuilder from '../../src/builder/DataBuilder';
 import {IColumnDesc, Column, ITypeFactory} from '../../src/model';
 
 interface IMyCustomDesc extends IColumnDesc {

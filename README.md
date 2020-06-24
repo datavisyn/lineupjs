@@ -106,7 +106,7 @@ Supported Browsers
 Demo Application
 ----------------
 
-A demo application is located at [lineup_app](https://github.com/lineupjs/lineup_app). It support CSV Import, CSV Export, JSON Export, CodePen Export, nad local data management. 
+A demo application is located at [lineup_app](https://github.com/lineupjs/lineup_app). It support CSV Import, CSV Export, JSON Export, CodePen Export, and local data management. 
 
 The application is deployed at [https://lineup.js.org/app](https://lineup.js.org/app)
 

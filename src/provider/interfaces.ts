@@ -1,9 +1,9 @@
-import {Column, Ranking, IColumnConstructor, IColumnDesc, IGroup, IndicesArray, IDataRow, IRankingDump, EAggregationState, IColorMappingFunctionConstructor, IMappingFunctionConstructor, ITypeFactory} from '../model';
+import {Column, Ranking, IColumnConstructor, IColumnDesc, IGroup, IndicesArray, IDataRow, IRankingDump, EAggregationState, IColorMappingFunctionConstructor, IMappingFunctionConstructor, ITypeFactory, INumberColumn} from '../model';
 import {AEventDispatcher, ISequence} from '../internal';
 import {IRenderTasks} from '../renderer';
 import {IAbortAblePromise as IAbortAblePromiseImpl} from 'lineupengine';
 
-export {ABORTED} from 'lineupengine';
+export {ABORTED, abortAble, abortAbleAll, abortAbleResolveNow, isAbortAble, abortAbleFetch} from 'lineupengine';
 export declare type IAbortAblePromise<T> = IAbortAblePromiseImpl<T>;
 
 export declare type IAggregationStrategy = 'group' | 'item' | 'group+item' | 'group+top+item' | 'group+item+top';
@@ -67,7 +67,7 @@ export interface IDataProvider extends AEventDispatcher {
 
   fromDescRef(ref: any): IColumnDesc;
 
-  mappingSample(col: Column): Promise<ISequence<number>> | ISequence<number>;
+  mappingSample(col: INumberColumn): Promise<ISequence<number>> | ISequence<number>;
 
   searchAndJump(search: string | RegExp, col: Column): void;
 

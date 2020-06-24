@@ -60,6 +60,10 @@ export default class DateColumn extends ValueColumn<Date> implements IDateColumn
     return this.format;
   }
 
+  getParser() {
+    return this.parse;
+  }
+
   dump(toDescRef: (desc: any) => any) {
     const r = super.dump(toDescRef);
     r.filter = isDummyDateFilter(this.currentFilter) ? null : this.currentFilter;

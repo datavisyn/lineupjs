@@ -156,6 +156,25 @@ export interface IBuilder<T, R> {
 /**
  * @internal
  */
+export function dummyBoxPlot(): IAdvancedBoxPlotData {
+  return {
+    min: NaN,
+    max: NaN,
+    mean: NaN,
+    missing: 0,
+    count: 0,
+    whiskerHigh: NaN,
+    whiskerLow: NaN,
+    outlier: [],
+    median: NaN,
+    q1: NaN,
+    q3: NaN
+  };
+}
+
+/**
+ * @internal
+ */
 export function boxplotBuilder(fixedLength?: number): IBuilder<number, IAdvancedBoxPlotData> & {buildArr: (s: Float32Array) => IAdvancedBoxPlotData} {
   let min = Number.POSITIVE_INFINITY;
   let max = Number.NEGATIVE_INFINITY;
@@ -192,19 +211,7 @@ export function boxplotBuilder(fixedLength?: number): IBuilder<number, IAdvanced
   };
 
 
-  const invalid = {
-    min: NaN,
-    max: NaN,
-    mean: NaN,
-    missing,
-    count: length,
-    whiskerHigh: NaN,
-    whiskerLow: NaN,
-    outlier: [],
-    median: NaN,
-    q1: NaN,
-    q3: NaN
-  };
+  const invalid = Object.assign(dummyBoxPlot(), {missing, count: length});
 
   const buildImpl = (s: ArrayLike<number>) => {
     const valid = length - missing;
@@ -285,6 +292,22 @@ export function boxplotBuilder(fixedLength?: number): IBuilder<number, IAdvanced
     build,
     buildArr,
     pushAll: pushAll(pushAndSave)
+  };
+}
+
+
+/**
+ * @internal
+ */
+export function dummyStatistics(): IStatistics {
+  return {
+    min: NaN,
+    max: NaN,
+    mean: NaN,
+    missing: 0,
+    count: 0,
+    hist: [],
+    maxBin: 0
   };
 }
 
@@ -465,6 +488,23 @@ function pushDateHist(hist: IDateBin[], v: Date, count: number = 1) {
   }
   hist[low].count += count;
 }
+
+/**
+ * @internal
+ */
+export function dummyDateStatistics(): IDateStatistics {
+  return {
+    min: null,
+    max: null,
+    missing: 0,
+    count: 0,
+    hist: [],
+    maxBin: 0,
+    histGranularity: 'year'
+  };
+}
+
+
 /**
  * @internal
  */
@@ -531,6 +571,26 @@ export function dateStatsBuilder(template?: IDateStatistics): IBuilder<Date | nu
   };
 
   return {push, build, pushAll: pushAll(push)};
+}
+
+
+/**
+ * @internal
+ */
+export function dummyCategoricalStatistics(categories: {name: string}[]): ICategoricalStatistics {
+  return {
+    missing: 0,
+    count: 0,
+    hist: categories.map((cat) => ({cat: cat.name, count: 0})),
+    maxBin: 0,
+  };
+}
+
+/**
+ * @internal
+ */
+export function dummyCategoricalStatisticsBuilder(categories: {name: string}[]) {
+  return () => dummyCategoricalStatistics(categories);
 }
 
 /**

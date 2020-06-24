@@ -1,5 +1,6 @@
 import {IAggregationStrategy} from './interfaces';
 import {IOrderedGroup, IGroup, IGroupParent, IGroupData, IGroupItem, isGroup} from '../model';
+import {createIndexArray} from '../internal';
 
 export function isAlwaysShowingGroupStrategy(strategy: IAggregationStrategy) {
   return strategy === 'group+item' || strategy === 'group+item+top' || strategy === 'group+top+item';
@@ -104,4 +105,18 @@ export function toRowMeta(item: IGroupData | IGroupItem, strategy: IAggregationS
     return null;
   }
   return `last${level === 1 ? '' : level - 1}`;
+}
+
+export function index2pos(groups: IOrderedGroup[], maxDataIndex: number) {
+  const total = groups.reduce((a, b) => a + b.order.length, 1);
+  const index2pos = createIndexArray(maxDataIndex + 1, total);
+  let offset = 1;
+  for (const g of groups) {
+    // tslint:disable-next-line
+    for (let i = 0; i < g.order.length; i++ , offset++) {
+      index2pos[g.order[i]] = offset;
+    }
+  }
+
+  return {groups, index2pos};
 }
