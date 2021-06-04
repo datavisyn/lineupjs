@@ -1,5 +1,5 @@
 import { Category, SupportType, toolbar } from './annotations';
-import { IndicesArray, IDataRow, IGroup, ECompareValueType, IValueColumnDesc } from './interfaces';
+import { IndicesArray, IDataRow, IGroup, ECompareValueType, IValueColumnDesc, ITypeFactory } from './interfaces';
 import type {
   widthChanged,
   labelChanged,
@@ -13,7 +13,7 @@ import type {
   visibilityChanged,
   dirtyCaches,
 } from './Column';
-import type Column from './Column';
+import Column from './Column';
 import type { dataLoaded } from './ValueColumn';
 import ValueColumn from './ValueColumn';
 import type { IEventListener } from '../internal';
@@ -43,20 +43,30 @@ export interface ISelectionColumnDesc extends IValueColumnDesc<boolean> {
 /**
  * emitted when rows are selected
  * @asMemberOf SelectionColumn
- * @param dataIndex the (de)seleced row
+ * @param dataIndex the (de)selected row
  * @param value true if selected else false
  * @param dataIndices in case of multiple rows are selected
  * @event
  */
-export declare function select_SC(dataIndex: number, value: boolean, dataIndices?: IndicesArray): void;
+export declare function select_SEC(dataIndex: number, value: boolean, dataIndices?: IndicesArray): void;
+
+/**
+ * emitted when the filter property changes
+ * @asMemberOf SelectionColumn
+ * @event
+ */
+export declare function filterChanged_SEC(previous: Set<number> | null, current: Set<number> | null): void;
 
 /**
  * a checkbox column for selections
  */
 @SupportType()
-@toolbar('sort', 'sortBy', 'group', 'groupBy', 'invertSelection')
+@toolbar('sort', 'sortBy', 'group', 'groupBy', 'invertSelection', 'filterSelection')
 @Category('support')
 export default class SelectionColumn extends ValueColumn<boolean> {
+  static readonly EVENT_FILTER_CHANGED = 'filterChanged';
+  static readonly EVENT_SELECT = 'select';
+
   private static SELECTED_GROUP: IGroup = {
     name: 'Selected',
     color: 'orange',
@@ -65,7 +75,8 @@ export default class SelectionColumn extends ValueColumn<boolean> {
     name: 'Unselected',
     color: 'gray',
   };
-  static readonly EVENT_SELECT = 'select';
+
+  private currentFilter: Set<number> | null = null;
 
   constructor(id: string, desc: Readonly<ISelectionColumnDesc>) {
     super(
@@ -81,10 +92,11 @@ export default class SelectionColumn extends ValueColumn<boolean> {
   }
 
   protected createEventList() {
-    return super.createEventList().concat([SelectionColumn.EVENT_SELECT]);
+    return super.createEventList().concat([SelectionColumn.EVENT_SELECT, SelectionColumn.EVENT_FILTER_CHANGED]);
   }
 
-  on(type: typeof SelectionColumn.EVENT_SELECT, listener: typeof select_SC | null): this;
+  on(type: typeof SelectionColumn.EVENT_SELECT, listener: typeof select_SEC | null): this;
+  on(type: typeof SelectionColumn.EVENT_FILTER_CHANGED, listener: typeof filterChanged_SEC | null): this;
   on(type: typeof ValueColumn.EVENT_DATA_LOADED, listener: typeof dataLoaded | null): this;
   on(type: typeof Column.EVENT_WIDTH_CHANGED, listener: typeof widthChanged | null): this;
   on(type: typeof Column.EVENT_LABEL_CHANGED, listener: typeof labelChanged | null): this;
@@ -148,4 +160,66 @@ export default class SelectionColumn extends ValueColumn<boolean> {
     const isSelected = this.getValue(row);
     return Object.assign({}, isSelected ? SelectionColumn.SELECTED_GROUP : SelectionColumn.NOT_SELECTED_GROUP);
   }
+
+  dump(toDescRef: (desc: any) => any): any {
+    const r = super.dump(toDescRef);
+    r.filter = this.currentFilter ? Array.from(this.currentFilter).sort((a, b) => a - b) : null;
+    return r;
+  }
+
+  restore(dump: any, factory: ITypeFactory) {
+    super.restore(dump, factory);
+    if (dump.filter) {
+      const filter = dump.filter;
+      this.currentFilter = new Set(filter);
+    } else {
+      this.currentFilter = null;
+    }
+  }
+
+  isFiltered() {
+    return this.currentFilter != null;
+  }
+
+  filter(row: IDataRow) {
+    if (!this.isFiltered()) {
+      return true;
+    }
+    const filter = this.currentFilter!;
+    return filter.has(row.i);
+  }
+
+  getFilter(): number[] | null {
+    return this.currentFilter == null ? null : Array.from(this.currentFilter);
+  }
+
+  setFilter(filter: number[] | null) {
+    const newValue = filter ? new Set(filter) : null;
+    if (areSameSets(newValue, this.currentFilter)) {
+      return;
+    }
+    this.fire(
+      [SelectionColumn.EVENT_FILTER_CHANGED, Column.EVENT_DIRTY_VALUES, Column.EVENT_DIRTY],
+      this.currentFilter,
+      (this.currentFilter = newValue)
+    );
+  }
+
+  clearFilter() {
+    const was = this.isFiltered();
+    this.setFilter(null);
+    return was;
+  }
+}
+
+function areSameSets(a: Set<number> | null, b: Set<number> | null) {
+  const aL = a != null ? a.size : 0;
+  const bL = b != null ? b.size : 0;
+  if (aL !== bL) {
+    return false;
+  }
+  if (aL === 0 || bL === 0) {
+    return true;
+  }
+  return Array.from(a).every((d) => b.has(d));
 }

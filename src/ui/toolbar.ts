@@ -30,12 +30,13 @@ import ShowTopNDialog from './dialogs/ShowTopNDialog';
 import SortDialog from './dialogs/SortDialog';
 import StringFilterDialog from './dialogs/StringFilterDialog';
 import WeightsEditDialog from './dialogs/WeightsEditDialog';
+import SelectionFilterDialog from './dialogs/SelectionFilterDialog';
 import type {
-  IOnClickHandler,
   IRankingHeaderContext,
+  IOnClickHandler,
+  IUIOptions,
   IToolbarAction,
   IToolbarDialogAddon,
-  IUIOptions,
 } from './interfaces';
 import appendDate from './dialogs/groupDate';
 import appendNumber from './dialogs/groupNumber';
@@ -287,6 +288,11 @@ export const toolbarActions: { [key: string]: IToolbarAction } = {
     featureLevel: 'basic',
   }),
   filterString: uiDialog('Filter &hellip;', StringFilterDialog, () => [], {
+    mode: 'menu+shortcut',
+    featureCategory: 'ranking',
+    featureLevel: 'basic',
+  }),
+  filterSelection: uiDialog('Filter &hellip;', SelectionFilterDialog, (ctx) => [ctx], {
     mode: 'menu+shortcut',
     featureCategory: 'ranking',
     featureLevel: 'basic',
