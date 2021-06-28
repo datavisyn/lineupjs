@@ -98,3 +98,22 @@
     max-height: 70vh;
   }
 }
+
+.#{$lu_css_prefix}-search-list li > .#{$lu_css_prefix}-searchbox-summary-entry {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+
+  > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  > span:first-of-type {
+    flex-grow: 1;
+  }
+
+  > span:last-of-type {
+    font-size: 75%;
+  }
+}
