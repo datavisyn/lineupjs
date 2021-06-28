@@ -286,7 +286,7 @@ export const toolbarActions: { [key: string]: IToolbarAction } = {
     featureCategory: 'ranking',
     featureLevel: 'basic',
   }),
-  filterString: uiDialog('Filter &hellip;', StringFilterDialog, () => [], {
+  filterString: uiDialog('Filter &hellip;', StringFilterDialog, (ctx) => [ctx], {
     mode: 'menu+shortcut',
     featureCategory: 'ranking',
     featureLevel: 'basic',

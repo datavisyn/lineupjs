@@ -17,12 +17,12 @@ import ACommonDataProvider from './ACommonDataProvider';
 import ADataProvider from './ADataProvider';
 import type { IDataProviderOptions } from './interfaces';
 import { CompareLookup } from './sort';
-import type { IRenderTaskExecutor } from './tasks';
+import type { ARenderTaskOptions, IRenderTaskExecutor } from './tasks';
 import { DirectRenderTasks } from './DirectRenderTasks';
 import { ScheduleRenderTasks } from './ScheduledTasks';
 import { joinGroups, mapIndices, duplicateGroup } from '../model/internal';
 
-export interface ILocalDataProviderOptions {
+export interface ILocalDataProviderOptions extends ARenderTaskOptions {
   /**
    * whether the filter should be applied to all rankings regardless where they are
    * default: false
@@ -58,6 +58,8 @@ export default class LocalDataProvider extends ACommonDataProvider {
     jumpToSearchResult: false,
 
     taskExecutor: 'direct',
+
+    stringTopNCount: 10,
   };
 
   private readonly reorderAll: () => void;
@@ -74,7 +76,10 @@ export default class LocalDataProvider extends ACommonDataProvider {
     super(columns, options);
     Object.assign(this.ooptions, options);
     this._dataRows = toRows(_data);
-    this.tasks = this.ooptions.taskExecutor === 'direct' ? new DirectRenderTasks() : new ScheduleRenderTasks();
+    this.tasks =
+      this.ooptions.taskExecutor === 'direct'
+        ? new DirectRenderTasks(this.ooptions)
+        : new ScheduleRenderTasks(this.ooptions);
     this.tasks.setData(this._dataRows);
 
     // eslint-disable-next-line @typescript-eslint/no-this-alias
@@ -351,7 +356,6 @@ export default class LocalDataProvider extends ACommonDataProvider {
           continue;
         }
         // sort
-        // tslint:disable-next-line:prefer-for-of
         for (let o = 0; o < order.length; ++o) {
           const i = order[o];
           if (maxDataIndex < i) {
@@ -363,7 +367,6 @@ export default class LocalDataProvider extends ACommonDataProvider {
       }
 
       // group, [sort]
-      // tslint:disable-next-line:prefer-for-of
       for (let o = 0; o < order.length; ++o) {
         const i = order[o];
         if (maxDataIndex < i) {

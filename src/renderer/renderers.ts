@@ -33,6 +33,7 @@ import UpSetCellRenderer from './UpSetCellRenderer';
 import VerticalBarCellRenderer from './VerticalBarCellRenderer';
 import DateCellRenderer from './DateCellRenderer';
 import DateHistogramCellRenderer from './DateHistogramCellRenderer';
+import StringHistogramCellRenderer from './StringHistogramCellRenderer';
 
 const defaultCellRenderer = new DefaultCellRenderer();
 /**
@@ -70,6 +71,7 @@ export const renderers: { [key: string]: ICellRendererFactory } = {
   sparkline: new SparklineCellRenderer(),
   stack: new MultiLevelCellRenderer(),
   string: new StringCellRenderer(),
+  stringhist: new StringHistogramCellRenderer(),
   table: new TableCellRenderer(),
   upset: new UpSetCellRenderer(),
   verticalbar: new VerticalBarCellRenderer(),

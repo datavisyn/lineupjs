@@ -75,7 +75,7 @@ export default class RemoteDataProvider extends ACommonDataProvider {
 
   getTaskExecutor(): IRenderTasks {
     // FIXME
-    return new DirectRenderTasks([]);
+    return new DirectRenderTasks();
   }
 
   sort(

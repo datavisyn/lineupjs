@@ -7,6 +7,7 @@ import type { IRankingHeaderContext, IToolbarDialogAddon } from '../interfaces';
 import { getToolbarDialogAddons, isGroupAble, isGroupSortAble, isSortAble } from '../toolbarResolvers';
 import SearchBox, { ISearchBoxOptions } from './SearchBox';
 import { dialogContext } from '../dialogs';
+import { setText } from '../../renderer/utils';
 
 interface IColumnItem {
   col: Column;
@@ -40,7 +41,7 @@ export default class Hierarchy {
         node.classList.add(cssClass('typed-icon'));
         node.dataset.typeCat = categoryOf(item.col).name;
         node.dataset.type = item.col.desc.type;
-        return item.text;
+        setText(node, item.text);
       },
     };
     this.groupAdder = new SearchBox(

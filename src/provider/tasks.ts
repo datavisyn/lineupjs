@@ -18,6 +18,8 @@ import {
   joinIndexArrays,
   IBuilder,
   ISequence,
+  IStringStatistics,
+  stringStatsBuilder,
 } from '../internal';
 import {
   CategoricalColumn,
@@ -36,6 +38,7 @@ import {
   Ranking,
   UIntTypedArray,
   ICategory,
+  StringColumn,
   isMapAbleColumn,
 } from '../model';
 import type { IRenderTask, IRenderTasks } from '../renderer';
@@ -136,12 +139,29 @@ export class MultiIndices {
  */
 const CHUNK_SIZE = 100;
 
+export interface ARenderTaskOptions {
+  stringTopNCount: number | readonly string[];
+}
+
 export class ARenderTasks {
-  protected readonly valueCacheData = new Map<string, Float32Array | UIntTypedArray | Int32Array | Float64Array>();
+  protected readonly valueCacheData = new Map<
+    string,
+    Float32Array | UIntTypedArray | Int32Array | Float64Array | readonly string[]
+  >();
 
   protected readonly byIndex = (i: number) => this.data[i];
 
-  constructor(protected data: IDataRow[] = []) {}
+  protected readonly options: ARenderTaskOptions;
+  protected data: IDataRow[] = [];
+
+  constructor(options: Partial<ARenderTaskOptions> = {}) {
+    this.options = Object.assign(
+      {
+        stringTopNCount: 10,
+      },
+      options
+    );
+  }
 
   protected byOrder(indices: IndicesArray): ISequence<IDataRow> {
     return lazySeq(indices).map(this.byIndex);
@@ -288,7 +308,7 @@ export class ARenderTasks {
         );
       }
 
-      const cache = this.valueCacheData.get(key);
+      const cache = this.valueCacheData.get(key) as UIntTypedArray;
       const acc: (i: number) => number = cache ? (i) => cache[i] : dacc;
       return this.builder(b, order, acc, build);
     }
@@ -325,7 +345,7 @@ export class ARenderTasks {
           build
         );
       }
-      const cache = this.valueCacheData.get(col.id);
+      const cache = this.valueCacheData.get(col.id) as UIntTypedArray;
       const acc: (i: number) => Date | null = cache
         ? (i) => dateValueCache2Value(cache[i])
         : (i) => col.getDate(this.data[i]);
@@ -360,13 +380,43 @@ export class ARenderTasks {
           build
         );
       }
-      const cache = this.valueCacheData.get(col.id);
+      const cache = this.valueCacheData.get(col.id) as UIntTypedArray;
       const acc: (i: number) => ICategory | null = cache
         ? (i) => categoricalValueCache2Value(cache[i], col.categories)
         : (i) => col.getCategory(this.data[i]);
       return this.builder(b, order, acc, build);
     }
     return this.builderForEach(b, order, (i: number) => col.iterCategory(this.data[i]), build);
+  }
+
+  protected stringStatsBuilder<R = IStringStatistics>(
+    order: IndicesArray | null | MultiIndices,
+    col: StringColumn,
+    topN?: number | readonly string[],
+    build?: (stat: IStringStatistics) => R
+  ) {
+    const b = stringStatsBuilder(topN ?? this.options.stringTopNCount);
+    if (order == null) {
+      // build and valueCache
+      let i = 0;
+      const vs: string[] = Array(this.data.length).fill(null);
+      return this.builder(
+        {
+          push: (v) => {
+            b.push(v);
+            vs[i++] = v;
+          },
+          build: () => {
+            this.setValueCacheData(col.id, vs);
+            return b.build();
+          },
+        },
+        null,
+        (i: number) => col.getValue(this.data[i]),
+        build
+      );
+    }
+    return this.builder(b, order, (i: number) => col.getValue(this.data[i]), build);
   }
 
   dirtyColumn(col: Column, type: 'data' | 'summary' | 'group') {
@@ -377,7 +427,10 @@ export class ARenderTasks {
     this.valueCacheData.delete(`${col.id}:r`);
   }
 
-  protected setValueCacheData(key: string, value: Float32Array | UIntTypedArray | Int32Array | Float64Array | null) {
+  protected setValueCacheData(
+    key: string,
+    value: Float32Array | UIntTypedArray | Int32Array | Float64Array | readonly string[] | null
+  ) {
     if (value == null) {
       this.valueCacheData.delete(key);
     } else {
@@ -391,10 +444,10 @@ export class ARenderTasks {
       return undefined;
     }
     if (col instanceof DateColumn) {
-      return (dataIndex: number) => dateValueCache2Value(v[dataIndex]);
+      return (dataIndex: number) => dateValueCache2Value(v[dataIndex] as number);
     }
     if (col instanceof CategoricalColumn || col instanceof OrdinalColumn) {
-      return (dataIndex: number) => categoricalValueCache2Value(v[dataIndex], col.categories);
+      return (dataIndex: number) => categoricalValueCache2Value(v[dataIndex] as number, col.categories);
     }
     return (dataIndex: number) => v[dataIndex];
   }

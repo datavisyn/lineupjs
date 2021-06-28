@@ -101,13 +101,13 @@ export default class StringCellRenderer implements ICellRendererFactory {
     };
   }
 
-  createSummary(col: StringColumn, _context: IRenderContext, interactive: boolean): ISummaryRenderer {
+  createSummary(col: StringColumn, context: IRenderContext, interactive: boolean): ISummaryRenderer {
     if (!interactive) {
       return {
         template: `<div></div>`,
         update: (node: HTMLElement) => {
           const filter = col.getFilter();
-          node.textContent = toString(filter);
+          node.textContent = filterToString(filter);
         },
       };
     }
@@ -115,25 +115,38 @@ export default class StringCellRenderer implements ICellRendererFactory {
     const bak = f.filter || '';
     let update: (col: StringColumn) => void;
     return {
-      template: `<form><input type="text" placeholder="Filter ${col.desc.label}..." autofocus value="${
-        bak instanceof RegExp ? bak.source : bak
-      }">
+      template: `<form><input type="text" placeholder="Filter ${col.desc.label}..." autofocus
+      list="${context.idPrefix}${col.id}_dl" value="${filterToString(f)}">
           <label class="${cssClass('checkbox')}">
             <input type="checkbox" ${bak instanceof RegExp ? 'checked="checked"' : ''}>
             <span>Use regular expressions</span>
           </label>
-          ${filterMissingMarkup(f.filterMissing)}</form>`,
+          ${filterMissingMarkup(f.filterMissing)}
+          <datalist id="${context.idPrefix}${col.id}_dl"></datalist></form>`,
       update: (node: HTMLElement) => {
         if (!update) {
           update = StringCellRenderer.interactiveSummary(col, node);
         }
         update(col);
+        const dl = node.querySelector('datalist')!;
+
+        // no return here = loading indicator since it won't affect the rendering
+        void context.tasks.summaryStringStats(col).then((r) => {
+          if (typeof r === 'symbol') {
+            return;
+          }
+          const { summary } = r;
+          matchDataList(dl, summary.topN);
+        });
       },
     };
   }
 }
 
-function toString(filter: IStringFilter | null) {
+/**
+ * @internal
+ */
+export function filterToString(filter: IStringFilter | null) {
   if (filter == null || !filter.filter) {
     return '';
   }
@@ -141,4 +154,29 @@ function toString(filter: IStringFilter | null) {
     return filter.filter.source;
   }
   return filter.filter;
+}
+
+/**
+ * matches the given stats to a datalist
+ * @internal
+ */
+export function matchDataList(node: HTMLDataListElement, matches: readonly { value: string; count: number }[]) {
+  const children = Array.from(node.options);
+  // update existing
+  for (let i = 0; i < matches.length; i++) {
+    const m = matches[i];
+    let child = children[i];
+    if (!child) {
+      child = node.ownerDocument.createElement('option');
+      node.appendChild(child);
+    }
+    child.value = m.value;
+    if (m.count > 1) {
+      setText(child, `${m.value} (${m.count.toLocaleString()})`);
+    }
+  }
+  // remove extra
+  for (let i = children.length - 1; i >= matches.length; i--) {
+    children[i].remove();
+  }
 }

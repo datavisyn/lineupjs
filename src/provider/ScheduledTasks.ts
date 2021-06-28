@@ -11,6 +11,7 @@ import {
   toIndexArray,
   WorkerTaskScheduler,
   createWorkerBlob,
+  IStringStatistics,
 } from '../internal';
 import TaskScheduler, { ABORTED, oneShotIterator } from '../internal/scheduler';
 import Column, {
@@ -26,6 +27,7 @@ import Column, {
   isDateColumn,
   isNumberColumn,
   Ranking,
+  StringColumn,
   UIntTypedArray,
 } from '../model';
 import type { IRenderTask } from '../renderer';
@@ -128,6 +130,8 @@ export class ScheduleRenderTasks extends ARenderTasks implements IRenderTaskExec
           this.summaryNumberStats(col, true, multi);
         } else if (isDateColumn(col)) {
           this.summaryDateStats(col, multi);
+        } else if (col instanceof StringColumn) {
+          this.summaryStringStats(col, multi);
         } else {
           continue;
         }
@@ -171,6 +175,11 @@ export class ScheduleRenderTasks extends ARenderTasks implements IRenderTaskExec
           this.groupNumberStats(col, g, false);
           this.groupNumberStats(col, g, true);
         }
+      } else if (col instanceof StringColumn) {
+        this.summaryStringStats(col, full);
+        for (const g of orderedGroups) {
+          this.groupStringStats(col, g);
+        }
       }
     }
   }
@@ -184,12 +193,26 @@ export class ScheduleRenderTasks extends ARenderTasks implements IRenderTaskExec
         this.dataNumberStats(col, true);
       } else if (isDateColumn(col)) {
         this.dataDateStats(col);
+      } else if (col instanceof StringColumn) {
+        this.dataStringStats(col);
       }
     }
   }
 
   preComputeCol(col: Column) {
     const ranking = col.findMyRanker();
+
+    if (col instanceof StringColumn) {
+      this.dataStringStats(col);
+      if (!ranking) {
+        return;
+      }
+      this.summaryStringStats(col);
+      for (const group of ranking.getGroups()) {
+        this.groupStringStats(col, group);
+      }
+      return;
+    }
 
     if (isCategoricalLikeColumn(col)) {
       this.dataCategoricalStats(col);
@@ -243,6 +266,8 @@ export class ScheduleRenderTasks extends ARenderTasks implements IRenderTaskExec
         this.dataNumberStats(col, true);
       } else if (isDateColumn(col)) {
         this.dataDateStats(col);
+      } else if (col instanceof StringColumn) {
+        this.dataStringStats(col);
       } else {
         continue;
       }
@@ -407,6 +432,29 @@ export class ScheduleRenderTasks extends ARenderTasks implements IRenderTaskExec
     });
   }
 
+  groupStringStats(col: StringColumn, group: IOrderedGroup) {
+    const key = `${col.id}:a:group:${group.name}`;
+    return this.chain(key, this.summaryStringStats(col), ({ summary, data }) => {
+      const ranking = col.findMyRanker()!;
+      const topN = summary.topN.map((d) => d.value);
+      if (this.valueCacheData.has(col.id) && group.order.length > 0) {
+        // web worker version
+        return () =>
+          this.workers
+            .pushStats(
+              'stringStats',
+              { topN: this.options.stringTopNCount },
+              col.id,
+              this.valueCacheData.get(col.id) as readonly string[],
+              `${ranking.id}:${group.name}`,
+              group.order
+            )
+            .then((group) => ({ group, summary, data }));
+      }
+      return this.stringStatsBuilder(group.order, col, topN, (group) => ({ group, summary, data }));
+    });
+  }
+
   summaryBoxPlotStats(col: Column & INumberColumn, raw?: boolean, order?: MultiIndices) {
     return this.chain(`${col.id}:b:summary${raw ? ':braw' : ':b'}`, this.dataBoxPlotStats(col, raw), (data) => {
       const ranking = col.findMyRanker()!;
@@ -493,6 +541,30 @@ export class ScheduleRenderTasks extends ARenderTasks implements IRenderTaskExec
             .then((summary) => ({ summary, data }));
       }
       return this.dateStatsBuilder(order ? order : ranking.getOrder(), col, data, (summary) => ({ summary, data }));
+    });
+  }
+
+  summaryStringStats(col: StringColumn, order?: MultiIndices) {
+    return this.chain(`${col.id}:b:summary`, this.dataStringStats(col), (data) => {
+      const ranking = col.findMyRanker()!;
+      if (this.valueCacheData.has(col.id)) {
+        // web worker version
+        return () =>
+          this.workers
+            .pushStats(
+              'stringStats',
+              { topN: this.options.stringTopNCount },
+              col.id,
+              this.valueCacheData.get(col.id) as readonly string[],
+              ranking.id,
+              order ? order.joined : ranking.getOrder()
+            )
+            .then((summary) => ({ summary, data }));
+      }
+      return this.stringStatsBuilder(order ? order : ranking.getOrder(), col, undefined, (summary) => ({
+        summary,
+        data,
+      }));
     });
   }
 
@@ -636,6 +708,10 @@ export class ScheduleRenderTasks extends ARenderTasks implements IRenderTaskExec
 
   dataCategoricalStats(col: Column & ICategoricalLikeColumn) {
     return this.cached(`${col.id}:c:data`, false, this.categoricalStatsBuilder<ICategoricalStatistics>(null, col));
+  }
+
+  dataStringStats(col: StringColumn) {
+    return this.cached(`${col.id}:c:data`, false, this.stringStatsBuilder<IStringStatistics>(null, col));
   }
 
   dataDateStats(col: Column & IDateColumn) {

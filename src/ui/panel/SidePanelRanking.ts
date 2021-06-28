@@ -122,27 +122,31 @@ export default class SidePanelRanking {
       return;
     }
 
-    clear(node);
-
-    const copy = new Map(this.entries);
+    const currentEntries = new Map(this.entries);
     this.entries.clear();
 
-    columns.forEach((col) => {
-      const existing = copy.get(col.id);
+    columns.forEach((col, i) => {
+      const existing = currentEntries.get(col.id);
       if (existing) {
         existing.update(this.ctx);
-        node.appendChild(existing.node);
+        if (node.children[i] !== existing.node) {
+          // change node order if it doesn't match
+          node.appendChild(existing.node);
+        }
         this.entries.set(col.id, existing);
-        copy.delete(col.id);
+        currentEntries.delete(col.id);
         return;
       }
 
       const entry = new SidePanelEntryVis(col, this.ctx, node.ownerDocument!);
-      node.appendChild(entry.node);
+      node.insertBefore(entry.node, node.children[i]);
       this.entries.set(col.id, entry);
     });
 
-    copy.forEach((d) => d.destroy());
+    currentEntries.forEach((d) => {
+      d.node.remove();
+      d.destroy();
+    });
   }
 
   destroy() {

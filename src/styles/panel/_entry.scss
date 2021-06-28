@@ -38,7 +38,8 @@
     display: none;
   }
 
-  &.#{$lu_css_prefix}-renderer-string {
+  &.#{$lu_css_prefix}-renderer-string,
+  &.#{$lu_css_prefix}-renderer-stringhist {
     display: flex;
     flex-direction: column;
     height: auto;

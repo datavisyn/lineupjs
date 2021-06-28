@@ -18,7 +18,7 @@ function isItem<T extends IItem>(v: T | IGroupSearchItem<T>): v is T {
 export interface ISearchBoxOptions<T extends IItem> {
   doc: Document;
 
-  formatItem(item: T | IGroupSearchItem<T>, node: HTMLElement): string;
+  formatItem(item: T | IGroupSearchItem<T>, node: HTMLElement): string | void;
 
   placeholder: string;
 }
@@ -104,7 +104,10 @@ export default class SearchBox<T extends IItem> extends AEventDispatcher {
         node.appendChild(li);
       }
       const item = li.firstElementChild! as HTMLElement;
-      item.innerHTML = this.options.formatItem(v, item);
+      const r = this.options.formatItem(v, item);
+      if (typeof r === 'string') {
+        item.innerHTML = r;
+      }
     }
   }
 

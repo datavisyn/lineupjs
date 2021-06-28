@@ -68,3 +68,10 @@ export declare type IDateHistGranularity = 'year' | 'month' | 'day';
 export interface IDateStatistics extends IHistogramStats<Date> {
   readonly histGranularity: IDateHistGranularity;
 }
+
+export interface IStringStatistics {
+  readonly missing: number;
+  readonly count: number;
+  readonly unique: number;
+  readonly topN: readonly { value: string; count: number }[];
+}

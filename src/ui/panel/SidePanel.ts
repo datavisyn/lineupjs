@@ -22,6 +22,7 @@ import { dialogContext } from '../dialogs';
 import SearchBox, { IGroupSearchItem, ISearchBoxOptions } from './SearchBox';
 import SidePanelRanking from './SidePanelRanking';
 import { format } from 'd3-format';
+import { setText } from '../../renderer/utils';
 
 export interface IColumnWrapper {
   desc: IColumnDesc;
@@ -69,7 +70,7 @@ export default class SidePanel {
         node.parentElement.classList.toggle(cssClass('feature-advanced'), w.category.featureLevel === 'advanced');
         node.parentElement.classList.toggle(cssClass('feature-basic'), w.category.featureLevel === 'basic');
       }
-      return item.text;
+      setText(node, item.text);
     },
     collapseable: true,
   };
